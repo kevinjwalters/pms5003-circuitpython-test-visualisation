@@ -1,4 +1,4 @@
-### test-visualisation v0.7
+### test-visualisation v0.8
 
 ### MIT License
 
@@ -26,6 +26,10 @@
 ### This adds some hooks to a few tests then runs them to produce a visual
 ### representation of the state of pseudo serial object to create animations
 ### to help understand the tests
+
+### There are probably more elegant ways to position and maintain the position
+### of graphviz nodes and labels than the techniques used here
+
 
 import math
 import re
@@ -104,6 +108,9 @@ class TestVisualizerGV:
         self._gv_buffer = bytearray(self._gv_rx_buf_size)
         self._gv_buflen = 0
         self._gv_buf_width = 16  ### TODO - this needs to be adaptive / look nice / maybe handle odd numbers
+        
+        ### Make an initial frame
+        self.make_diagram()
 
 
     def _simulate_rx_posthook(self, obj, data):
@@ -213,7 +220,7 @@ class TestVisualizerGV:
 
 
     @staticmethod
-    def _padfirstgvline(text, length):
+    def _padfirstgvline(text, length, *, prefix=False):
         eol = re.search("\\\\[nlr]", text)  ### NB: escaped doubleslash!
         if eol:
             first_eol_idx = eol.span()[0]
@@ -223,26 +230,38 @@ class TestVisualizerGV:
             line1 = text
             rest = ""
 
-        return ((line1 if len(line1) >= length
-                 else (line1 + " " * (length - len(line1))))
-                + rest)
+        if len(line1) >= length:
+            return text
+        else:
+            if prefix:
+                return " " * (length - len(line1)) + text
+            else:
+                return line1 + " " * (length - len(line1)) + rest
 
 
     def make_diagram(self):
+        command_cwidth = 14 + 4 * 8
         tl = Digraph('structs',
                      filename="frame-{:s}-{:04d}.gv".format(self._name,
                                                             self._frame),
                      format='png',
-                     node_attr={'shape': 'none', "fontname": "Courier"})
+                     graph_attr={"labelloc": "t",
+                                 "fontname": "Times New Roman, Bold",
+                                 "fontsize": "16",
+                                 "label": "Test " + self._name + "\\n\\n"},
+                     node_attr={"shape": "none",
+                                "fontname": "Courier"})
 
-        with tl.subgraph(name="child0") as lab:
+        with tl.subgraph(name="left_col") as lab:
             lab.node("textline1", "RX wire")
             lab.node("textline2", "Buffer \llen {:3s}".format(str(self._gv_rx_buf_size)))
             lab.node("textline3", "Command")
+            lab.node("textline4", " ", fontsize="10", shape="none")
             lab.edge("textline1", "textline2", style="invis")
             lab.edge("textline2", "textline3", style="invis")
+            lab.edge("textline3", "textline4", style="invis")
 
-        with tl.subgraph(name="child1") as d:
+        with tl.subgraph(name="right_col") as d:
             gvbufrepr = self._make_table(self._gv_buffer, self._gv_buflen,
                                          width=self._gv_buf_width,
                                          highlight=self._gv_buf_highlight)
@@ -250,42 +269,64 @@ class TestVisualizerGV:
             ### html appears to go inside extra angle brackets
             d.node('buffer', "<\n" + gvbufrepr + ">", width="6")
 
-            ### whitespace edge labels help keep spacing consistent
-            if self._serial_byte is None:
-                d.node('serial', self.NOBYTETEXT,
-                       labelfontcolor="gray", style="rounded", shape="box")
-                d.edge("serial", "buffer",
-                       fontsize="10", label=" \\n ", style="invis", weight="10000")  ### helps with positioning
-            else:
-                d.node('serial', "{:02x}".format(self._serial_byte),
-                       style="rounded", shape="box", weight="0")
-                if self._gv_buf_highlight:
-                    d.edges([("serial", "buffer:port_{:03d}:n".format(self._gv_buf_highlight[0]))])
-                    d.edge("serial", "buffer",
-                           fontsize="10", label=" \\n ", style="invis", weight="10000")  ### helps with positioning
+            with d.subgraph(name="pms5003_serial") as ps:
+                ### whitespace edge labels help keep spacing consistent
+                if self._serial_byte is None:
+                    ps.node('serial', self.NOBYTETEXT,
+                            labelfontcolor="gray", style="rounded", shape="box")
+                    ### helps with positioning
+                    ps.edge("serial", "buffer",
+                            fontsize="10", label=" \\n ", style="invis", weight="10000")
                 else:
-                    ### Implies buffer is full
-                    d.edge("serial", "buffer", style="dashed", weight="10000",
-                           fontsize="10",  ### 14 is default
-                           label="  discarded\\n  buffer full", arrowhead="none")
+                    ps.node('serial', "{:02x}".format(self._serial_byte),
+                            style="rounded", shape="box", weight="0")
+                    if self._gv_buf_highlight:
+                        ps.edges([("serial", "buffer:port_{:03d}:n".format(self._gv_buf_highlight[0]))])
+                        ### helps with positioning
+                        ps.edge("serial", "buffer",
+                                fontsize="10", label=" \\n ", style="invis", weight="10000")
+                    else:
+                        ### Implies buffer is full
+                        ps.edge("serial", "buffer", style="dashed", weight="10000",
+                                fontsize="10",  ### 14 is default
+                                fontcolor="red",
+                                label="  discarded\\n  buffer full", arrowhead="none")
+                ps.node("PMS003",
+                        "",
+                        height="0.5",
+                        fixedsize="true",
+                        imagescale="true",  ### make it fit inside node
+                        image="Pimoroni-PMS5003-cutout.png")
+                #ps.edge("pms5003", "serial", fontsize="10", label="TX", weight="0")
 
             ### Padding here is a simple way to maintain size and position
             ### The blank command is peculiar in neededing a space character
             ### to get matching height, hence " \\n" per line
             gv_cmd = self._gv_command if self._gv_command else " \\n" * 4
             d.node('command',
-                   self._padfirstgvline(gv_cmd, 14 + 4 * 8),
+                   self._padfirstgvline(gv_cmd, command_cwidth),
                    shape="none")
 
             if self._gv_buf_highlight and self._gv_command:
-                d.edge("buffer:" + "port_000:w", "command:w", color="blue", weight="0")
+                d.edge("buffer:" + "port_000:w", "command:w",
+                       color="mediumblue", weight="0")
             d.edge("buffer", "command", style="invis", weight="10000")
+
+            d.node('frame_number',
+                   self._padfirstgvline("frame {:3d}".format(self._frame),
+                                        round(command_cwidth * 14 / 10),
+                                        prefix=True),
+                   fontsize="10",
+                   shape="none")
+            d.edge("command", "frame_number", style="invis", weight="10000")
 
         self._frame_gv.append(tl)
         self._frame += 1
 
 
-with TestVisualizerGV("buffer_full_badframelen_short", (MockSerialArbitrary, PMS5003Simulator)):
+SERIAL_CLASSES = (MockSerialArbitrary, PMS5003Simulator)
+
+with TestVisualizerGV("buffer_full_badframelen_short", SERIAL_CLASSES):
     ### MockSerialArbitrary based
     test_buffer_full_badframelen_short()
 
@@ -296,6 +337,6 @@ with TestVisualizerGV("buffer_full_badframelen_short", (MockSerialArbitrary, PMS
 #    test_active_mode_to_passive_unlucky()  ### this works ok
 
 
-with TestVisualizerGV("test_odd_zero_burst", (MockSerialArbitrary, PMS5003Simulator)):
+with TestVisualizerGV("odd_zero_burst", SERIAL_CLASSES):
     ### PMS5003Simulator based
     test_odd_zero_burst()
