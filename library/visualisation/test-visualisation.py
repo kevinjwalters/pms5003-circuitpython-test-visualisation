@@ -1,4 +1,4 @@
-### test-visualisation v0.8
+### test-visualisation v1.0
 
 ### MIT License
 
@@ -207,10 +207,10 @@ class TestVisualizerGV:
                     cell_text = "{:02x}".format(buf[buf_idx]) if buf_idx < len(buf) else cls.NOBUF
                     port = "port_{:03d}".format(buf_idx)
                     fmt_cell_text = cell_text if buf_idx < buf_valid_len else font(cell_text,
-                                                                                   color="lightgrey")
+                                                                                   color="gray20")
                     extraargs = {"port": port}
                     if highlight and highlight[0] <= buf_idx < highlight[1]:
-                        extraargs["bgcolor"] = "yellow"
+                        extraargs["bgcolor"] = "orangered3"
 
                     row.add(td(fmt_cell_text, **extraargs))
                     buf_idx += 1
@@ -240,17 +240,25 @@ class TestVisualizerGV:
 
 
     def make_diagram(self):
-        command_cwidth = 14 + 4 * 8
+        command_cwidth = 14 + 4 * 8  ### read command plus 8 hex-encoded chars
         tl = Digraph('structs',
                      filename="frame-{:s}-{:04d}.gv".format(self._name,
                                                             self._frame),
                      format='png',
-                     graph_attr={"labelloc": "t",
+                     graph_attr={"bgcolor": "black",
+                                 "color": "white",
+                                 "fontcolor": "white",
+                                 "labelloc": "t",
                                  "fontname": "Times New Roman, Bold",
                                  "fontsize": "16",
-                                 "label": "Test " + self._name + "\\n\\n"},
-                     node_attr={"shape": "none",
-                                "fontname": "Courier"})
+                                 "label": "Test " + self._name + "\\n\\n",
+                                 "ranksep": "0.12"},
+                     node_attr={"color": "white",
+                                "fontcolor": "white",
+                                "shape": "none",
+                                "fontname": "Courier"},
+                     edge_attr={"color": "white",
+                                "fontcolor": "white"})
 
         with tl.subgraph(name="left_col") as lab:
             lab.node("textline1", "RX wire")
@@ -309,7 +317,7 @@ class TestVisualizerGV:
 
             if self._gv_buf_highlight and self._gv_command:
                 d.edge("buffer:" + "port_000:w", "command:w",
-                       color="mediumblue", weight="0")
+                       color="blue", weight="0")
             d.edge("buffer", "command", style="invis", weight="10000")
 
             d.node('frame_number',
@@ -318,7 +326,8 @@ class TestVisualizerGV:
                                         prefix=True),
                    fontsize="10",
                    shape="none")
-            d.edge("command", "frame_number", style="invis", weight="10000")
+            d.edge("command", "frame_number",
+                   style="invis", weight="10000")
 
         self._frame_gv.append(tl)
         self._frame += 1
