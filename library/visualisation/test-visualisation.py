@@ -108,7 +108,7 @@ class TestVisualizerGV:
         self._gv_buffer = bytearray(self._gv_rx_buf_size)
         self._gv_buflen = 0
         self._gv_buf_width = 16  ### TODO - this needs to be adaptive / look nice / maybe handle odd numbers
-        
+
         ### Make an initial frame
         self.make_diagram()
 
@@ -335,17 +335,23 @@ class TestVisualizerGV:
 
 SERIAL_CLASSES = (MockSerialArbitrary, PMS5003Simulator)
 
-with TestVisualizerGV("buffer_full_badframelen_short", SERIAL_CLASSES):
-    ### MockSerialArbitrary based
-    test_buffer_full_badframelen_short()
-
 
 ### THIS SPITS WAY TOO MANY FRAMES!
 #with TestVisualizerGV("active_mode_to_passive_unlucky", (MockSerialArbitrary, PMS5003Simulator)):
 #    ### PMS5003Simulator based
 #    test_active_mode_to_passive_unlucky()  ### this works ok
 
-
+### For Reading the Header
 with TestVisualizerGV("odd_zero_burst", SERIAL_CLASSES):
     ### PMS5003Simulator based
     test_odd_zero_burst()
+
+### For Reading the Header
+with TestVisualizerGV("buffer_full_badframelen_long1", SERIAL_CLASSES):
+    ### MockSerialArbitrary based
+    test_buffer_full_badframelen_long1()
+
+### Partial Read of a Data Frame
+with TestVisualizerGV("buffer_full_truncation", SERIAL_CLASSES):
+    ### MockSerialArbitrary based
+    test_buffer_full_truncation()
