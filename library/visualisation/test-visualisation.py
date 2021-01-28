@@ -1,4 +1,4 @@
-### test-visualisation v1.0
+### test-visualisation v1.1
 
 ### MIT License
 
@@ -180,10 +180,8 @@ class TestVisualizerGV:
 
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        print("RENDER TIME")
         for gv in self._frame_gv:
             gv.render()
-        print("RENDER DONE")
         self._unhook()
 
 
@@ -335,12 +333,6 @@ class TestVisualizerGV:
 
 SERIAL_CLASSES = (MockSerialArbitrary, PMS5003Simulator)
 
-
-### THIS SPITS WAY TOO MANY FRAMES!
-#with TestVisualizerGV("active_mode_to_passive_unlucky", (MockSerialArbitrary, PMS5003Simulator)):
-#    ### PMS5003Simulator based
-#    test_active_mode_to_passive_unlucky()  ### this works ok
-
 ### For Reading the Header
 with TestVisualizerGV("odd_zero_burst", SERIAL_CLASSES):
     ### PMS5003Simulator based
@@ -355,3 +347,9 @@ with TestVisualizerGV("buffer_full_badframelen_long1", SERIAL_CLASSES):
 with TestVisualizerGV("buffer_full_truncation", SERIAL_CLASSES):
     ### MockSerialArbitrary based
     test_buffer_full_truncation()
+
+### Retry mechanism skipping a dodgy frames
+with TestVisualizerGV("checksum_retries_ok", SERIAL_CLASSES):
+    ### MockSerialArbitrary based
+    test_checksum_retries_ok()
+
